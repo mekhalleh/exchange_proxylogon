@@ -19,11 +19,12 @@
 
 ## Options
 
-1. `Proxies`. This option is not set by default.
-2. `RPORT`. The default setting is `443`. To use: `set RPORT [PORT]`
-3. `SSL`. The default setting is `true`.
-4. `THREADS`. The default setting is `1`.
-5. `VHOST`. This option is not set by default.
+1. `METHOD`. HTTP Method to use (for CVE-2021-26855). Default: `POST`
+2. `Proxies`. This option is not set by default.
+3. `RPORT`. The default setting is `443`. To use: `set RPORT [PORT]`
+4. `SSL`. The default setting is `true`.
+5. `THREADS`. The default setting is `1`.
+6. `VHOST`. This option is not set by default.
 
 ## Scenarios
 
@@ -34,6 +35,7 @@ Module options (auxiliary/scanner/http/exchange_proxylogon):
 
    Name     Current Setting  Required  Description
    ----     ---------------  --------  -----------
+   METHOD   POST             yes       HTTP Method to use (for CVE-2021-26855). (Accepted: GET, POST)
    Proxies                   no        A proxy chain of format type:host:port[,type:host:port][...]
    RHOSTS   172.16.5.6       yes       The target host(s), range CIDR identifier, or hosts file with syntax 'file:<path>'
    RPORT    443              yes       The target port (TCP)
@@ -53,3 +55,4 @@ msf6 auxiliary(scanner/http/exchange_proxylogon) >
 ## References
 
 1. <https://proxylogon.com/>
+2. <https://raw.githubusercontent.com/microsoft/CSS-Exchange/main/Security/http-vuln-cve2021-26855.nse>
