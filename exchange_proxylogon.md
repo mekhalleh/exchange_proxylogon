@@ -19,7 +19,7 @@
 
 ## Options
 
-1. `METHOD`. HTTP Method to use (for CVE-2021-26855). Default: `POST`
+1. `METHOD`. HTTP Method to use for the check. Default: `POST`
 2. `Proxies`. This option is not set by default.
 3. `RPORT`. The default setting is `443`. To use: `set RPORT [PORT]`
 4. `SSL`. The default setting is `true`.
@@ -42,7 +42,6 @@ Module options (auxiliary/scanner/http/exchange_proxylogon):
    SSL      true             no        Negotiate SSL/TLS for outgoing connections
    THREADS  1                yes       The number of concurrent threads (max one per host)
    VHOST                     no        HTTP server virtual host
-
 
 msf6 auxiliary(scanner/http/exchange_proxylogon) > run
 
