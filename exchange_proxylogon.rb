@@ -38,7 +38,6 @@ class MetasploitModule < Msf::Auxiliary
           ['CVE', '2021-26855'],
           ['LOGO', 'https://proxylogon.com/images/logo.jpg'],
           ['URL', 'https://proxylogon.com/'],
-          ['URL', 'https://raw.githubusercontent.com/microsoft/CSS-Exchange/main/Security/http-vuln-cve2021-26855.nse'],
           ['URL', 'http://aka.ms/exchangevulns']
         ],
         'DisclosureDate' => '2021-03-02',
@@ -77,9 +76,16 @@ class MetasploitModule < Msf::Auxiliary
       return Exploit::CheckCode::Unknown
     end
 
-    if received && received.code != 500
+    if received && (received.code != 500 && received.code != 503)
       print_error(message('The target is not vulnerable to CVE-2021-26855.'))
       vprint_error("Obtained HTTP response code #{received.code} for #{full_uri(uri)}.")
+
+      return Exploit::CheckCode::Safe
+    end
+
+    if received.headers['X-CalculatedBETarget'] != 'localhost'
+      print_error(message('The target is not vulnerable to CVE-2021-26855.'))
+      vprint_error('Could\'t obtain a correct \'X-CalculatedBETarget\' in the response header.')
 
       return Exploit::CheckCode::Safe
     end

