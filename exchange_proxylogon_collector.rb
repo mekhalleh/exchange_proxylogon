@@ -27,8 +27,8 @@ class MetasploitModule < Msf::Auxiliary
           All components are vulnerable by default.
         },
         'Author' => [
-          'Orange Tsai',                  # Dicovery (Officially acknowledged by MSRC)
-          'GreyOrder',                    # PoC (https://github.com/GreyOrder)
+          'Orange Tsai', # Dicovery (Officially acknowledged by MSRC)
+          'GreyOrder', # PoC (https://github.com/GreyOrder)
           'mekhalleh (RAMELLA Sébastien)' # Module author independent researcher (work at Zeop Entreprise)
         ],
         'References' => [

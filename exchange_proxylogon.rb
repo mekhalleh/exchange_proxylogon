@@ -32,7 +32,7 @@ class MetasploitModule < Msf::Auxiliary
           All components are vulnerable by default.
         },
         'Author' => [
-          'Orange Tsai',                  # Dicovery (Officially acknowledged by MSRC)
+          'Orange Tsai', # Dicovery (Officially acknowledged by MSRC)
           'mekhalleh (RAMELLA Sébastien)' # Module author (Zeop Entreprise)
         ],
         'References' => [
