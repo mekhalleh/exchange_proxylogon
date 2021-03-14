@@ -80,3 +80,6 @@ Dump user emails from exchange server.
 ## References
 
 1. <https://proxylogon.com/>
+2. <http://aka.ms/exchangevulns>
+3. <https://www.praetorian.com/blog/reproducing-proxylogon-exploit>
+4. <https://testbnull.medium.com/ph%C3%A2n-t%C3%ADch-l%E1%BB%97-h%E1%BB%95ng-proxylogon-mail-exchange-rce-s%E1%BB%B1-k%E1%BA%BFt-h%E1%BB%A3p-ho%C3%A0n-h%E1%BA%A3o-cve-2021-26855-37f4b6e06265>

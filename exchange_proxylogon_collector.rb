@@ -27,14 +27,17 @@ class MetasploitModule < Msf::Auxiliary
           All components are vulnerable by default.
         },
         'Author' => [
-          'mekhalleh (RAMELLA Sébastien)' # Module author (Zeop Entreprise)
+          'Orange Tsai',                  # Dicovery (Officially acknowledged by MSRC)
+          'GreyOrder',                    # PoC (https://github.com/GreyOrder)
+          'mekhalleh (RAMELLA Sébastien)' # Module author independent researcher (work at Zeop Entreprise)
         ],
         'References' => [
           ['CVE', '2021-26855'],
           ['LOGO', 'https://proxylogon.com/images/logo.jpg'],
           ['URL', 'https://proxylogon.com/'],
-          ['URL', 'http://aka.ms/exchangevulns'],
-          ['URL', 'https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/distinguishedfolderid']
+          ['URL', 'https://aka.ms/exchangevulns'],
+          ['URL', 'https://docs.microsoft.com/en-us/exchange/client-developer/web-service-reference/distinguishedfolderid'],
+          ['URL', 'https://github.com/3gstudent/Homework-of-Python/blob/master/ewsManage.py']
         ],
         'DisclosureDate' => '2021-03-02',
         'License' => MSF_LICENSE,
