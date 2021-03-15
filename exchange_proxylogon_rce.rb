@@ -335,7 +335,7 @@ class MetasploitModule < Msf::Exploit::Remote
         break
       end
 
-      print_warning(" * wail a lot (#{i})")
+      print_warning(" * wait a lot (#{i})")
       sleep 5
       i += 1
     end
