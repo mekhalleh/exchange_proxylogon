@@ -180,6 +180,13 @@ class MetasploitModule < Msf::Exploit::Remote
       fail_with(Failure::Unknown, 'No email address was found')
     end
 
+    case response.body
+    when %r{<ErrorCode>500</ErrorCode>}
+      fail_with(Failure::Unknown, 'No Autodiscover information was found')
+    when %r{<Action>redirectAddr</Action>}
+      fail_with(Failure::Unknown, 'No email address was found')
+    end
+
     xml = Nokogiri::XML.parse(response.body)
 
     legacy_dn = xml.at_xpath('//xmlns:User/xmlns:LegacyDN', xmlns).content

@@ -49,6 +49,10 @@ This is MAPI client version sent in the request.
 
 Max counter loop to wait for OAB Virtual Dir reset. Default: 30
 
+### TIMEOUT
+
+The number of seconds to wait for a reply from a HTTP request. Default: 15
+
 ## Scenarios
 
 ```
