@@ -172,7 +172,7 @@ class MetasploitModule < Msf::Exploit::Remote
       soap_autodiscover,
       'text/xml; charset=utf-8'
     )
-    fail_with(Failure::Unknown, 'No Autodiscover information was found') if response.body =~ /<ErrorCode>500<\/ErrorCode>/
+    fail_with(Failure::Unknown, 'No Autodiscover information was found') if response.body =~ %r{<ErrorCode>500</ErrorCode>}
 
     xml = Nokogiri::XML.parse(response.body)
 
