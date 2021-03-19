@@ -187,9 +187,9 @@ class MetasploitModule < Msf::Auxiliary
     response = send_xml('POST', "#{server_name}/autodiscover/autodiscover.xml?a=~1942062522", soap_autodiscover)
 
     case response.body
-    when /<ErrorCode>500<\/ErrorCode>/
+    when %r{<ErrorCode>500</ErrorCode>}
       fail_with(Failure::NotFound, 'No Autodiscover information was found')
-    when /<Action>redirectAddr<\/Action>/
+    when %r{<Action>redirectAddr</Action>}
       fail_with(Failure::NotFound, 'No email address was found')
     end
 
