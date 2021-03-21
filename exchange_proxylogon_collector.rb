@@ -407,12 +407,12 @@ class MetasploitModule < Msf::Auxiliary
         next unless host != server_name.downcase
 
         response = send_http('GET', "#{host}/EWS/Exchange.asmx?a=~#{random_ssrf_id}")
-        if response.code == 200
-          target = host
-          print_good("Targeting internal: #{url}")
+        next unless response.code == 200
 
-          break
-        end
+        target = host
+        print_good("Targeting internal: #{url}")
+
+        break
       end
       fail_with(Failure::NotFound, 'No internal target was found') if target.empty?
     else

