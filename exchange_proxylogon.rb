@@ -56,10 +56,6 @@ class MetasploitModule < Msf::Auxiliary
     register_options([
       OptEnum.new('METHOD', [true, 'HTTP Method to use for the check.', 'POST', ['GET', 'POST']])
     ])
-
-    register_advanced_options([
-      OptString.new('TIMEOUT', [true, 'The number of seconds to wait for a reply from a HTTP request', 15])
-    ])
   end
 
   def message(msg)
@@ -74,7 +70,7 @@ class MetasploitModule < Msf::Auxiliary
       'method' => datastore['METHOD'],
       'uri' => uri,
       'cookie' => 'X-AnonResource=true; X-AnonResource-Backend=localhost/ecp/default.flt?~3; X-BEResource=localhost/owa/auth/logon.aspx?~3;'
-    }, timeout = datastore['TIMEOUT'])
+    })
     unless received
       print_error(message('No response, target seems down.'))
 

