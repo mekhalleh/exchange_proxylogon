@@ -348,9 +348,11 @@ class MetasploitModule < Msf::Exploit::Remote
     # get informations by autodiscover request.
     print_status(message('Sending autodiscover request'))
     server_id, legacy_dn = request_autodiscover(server_name)
+    server_name = "#{server_name}.#{server_id.split('@')[1]}"
 
     print_status("Server: #{server_id}")
     print_status("LegacyDN: #{legacy_dn}")
+    print_status("Internal FQDN: #{server_name}")
 
     # get the user UID using mapi request.
     print_status(message('Sending mapi request'))
