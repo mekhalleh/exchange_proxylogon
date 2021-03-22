@@ -135,7 +135,7 @@ class MetasploitModule < Msf::Exploit::Remote
   end
 
   def encode_cmd(cmd)
-    cmd.!gsub('\\', '\\\\\\')
+    cmd.gsub!('\\', '\\\\\\')
     cmd.gsub('"', '\u0022').gsub('&', '\u0026').gsub('+', '\u002b')
   end
 
