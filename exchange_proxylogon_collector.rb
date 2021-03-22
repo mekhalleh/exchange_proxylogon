@@ -162,6 +162,7 @@ class MetasploitModule < Msf::Auxiliary
     xml.xpath('//t:Items/t:Message', XMLNS).each do |item|
       item_info = item.at_xpath('./t:ItemId', XMLNS)&.values
       next if item_info.nil?
+
       print_status("Download item: #{item_info[1]}")
 
       response = send_xml('POST', ssrf, soap_downitem(item_info[0], item_info[1]))
